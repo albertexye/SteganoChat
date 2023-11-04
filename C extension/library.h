@@ -4,17 +4,40 @@
 #include <inttypes.h>
 #include <stdbool.h>
 
-void *precompute(const uint8_t *const *images, const uint64_t *image_widths, const uint64_t *image_heights,
-                 const uint64_t *image_channels, uint64_t images_len, uint64_t data_size, uint64_t structure_size); // TODO uint test
+uint8_t *embed(uint8_t *data, uint64_t data_len, uint8_t *pixel, uint64_t image_w, uint64_t image_h, uint64_t image_c);
 
-void free_precomputed(void *precomputed); // TODO uint test
+uint8_t *extract(const uint8_t *pixels, uint64_t image_w, uint64_t image_h, uint64_t image_c);
 
-bool precomputed_successful(const void *precomputed); // TODO uint test
+const uint64_t SQUARE_SIZE = 8;
 
-uint64_t *precomputed_image_capacity_map(const void *precomputed); // TODO uint test
+typedef struct Image {
+    uint8_t *pixels;
+    uint64_t w, h, c;
+} Image;
 
-uint8_t **embed(void *precomputed, uint8_t **data); // TODO uint test
+typedef struct Square {
+    uint64_t x, y;
+    double entropy;
+} Square;
 
-void free_embedded(uint8_t **embedded); // TODO uint test
+uint64_t calc_square_size(const Image *image);
+
+uint64_t calc_image_capacity(const Image *image);
+
+void calc_entropy(const Image *image, Square *square);
+
+int compare_squares(const void *a, const void *b);
+
+Square *get_squares(const Image *image);
+
+void embed_square(const Image *image, const Square *square, const uint8_t *data);
+
+bool embed_data(const Image *image, const Square *squares, const uint8_t *data, uint64_t data_len);
+
+void extract_square(const Image *image, const Square *square, uint8_t *data);
+
+uint64_t extract_length(const Image *image, const Square *squares);
+
+uint8_t *extract_data(const Image *image, const Square *squares);
 
 #endif //C_EXTENSION_LIBRARY_H
