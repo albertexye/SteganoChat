@@ -73,6 +73,7 @@ class Steganography:
             image = self.precomputed[i][1]
             DLL.embed(
                 ctypes.c_char_p(pieces[i]),
+                ctypes.c_uint64(len(pieces[i])),
                 ctypes.c_char_p(image.tobytes()),
                 ctypes.c_uint64(image.width),
                 ctypes.c_uint64(image.height),
