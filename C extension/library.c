@@ -18,12 +18,20 @@ embed(uint8_t *data, uint64_t data_len, uint8_t *pixels, uint64_t image_w, uint6
 }
 
 
-uint8_t *extract(const uint8_t *pixels, uint64_t image_w, uint64_t image_h, uint64_t image_c) {
-    Image image = {pixels, image_w, image_h, image_c};
+Data *extract(const uint8_t *pixels, uint64_t image_w, uint64_t image_h, uint64_t image_c) {
+    Image image = {(uint8_t *) pixels, image_w, image_h, image_c};
     Square *squares = get_squares(&image);
-    uint8_t *data = extract_data(&image, squares);
+    Data *data = extract_data(&image, squares);
     free(squares);
     return data;
+}
+
+uint8_t *get_data(const Data *data) {
+    return data->data;
+}
+
+uint64_t get_len(const Data *data) {
+    return data->len;
 }
 
 
@@ -152,7 +160,7 @@ uint64_t extract_length(const Image *image, const Square *square) {
     return data_len;
 }
 
-uint8_t *extract_data(const Image *image, const Square *squares) {
+Data *extract_data(const Image *image, const Square *squares) {
     const uint64_t square_size = calc_square_size(image);
     const uint64_t data_len = extract_length(image, squares);
     const uint64_t capacity = calc_image_capacity(image);
@@ -175,5 +183,9 @@ uint8_t *extract_data(const Image *image, const Square *squares) {
         memcpy(data + data_len - padding_size, padding, padding_size);
     }
 
-    return data;
+    Data *result = (Data *) malloc(sizeof(Data));
+    result->data = data;
+    result->len = data_len;
+
+    return result;
 }

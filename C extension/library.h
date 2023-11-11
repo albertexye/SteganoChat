@@ -4,9 +4,20 @@
 #include <inttypes.h>
 #include <stdbool.h>
 
+
+typedef struct Data {
+    uint8_t *data;
+    uint64_t len;
+} Data;
+
 uint8_t *embed(uint8_t *data, uint64_t data_len, uint8_t *pixel, uint64_t image_w, uint64_t image_h, uint64_t image_c);
 
-uint8_t *extract(const uint8_t *pixels, uint64_t image_w, uint64_t image_h, uint64_t image_c);
+Data *extract(const uint8_t *pixels, uint64_t image_w, uint64_t image_h, uint64_t image_c);
+
+uint8_t *get_data(const Data *data);
+
+uint64_t get_len(const Data *data);
+
 
 const uint64_t SQUARE_SIZE = 8;
 
@@ -38,6 +49,6 @@ void extract_square(const Image *image, const Square *square, uint8_t *data);
 
 uint64_t extract_length(const Image *image, const Square *squares);
 
-uint8_t *extract_data(const Image *image, const Square *squares);
+Data *extract_data(const Image *image, const Square *squares);
 
 #endif //C_EXTENSION_LIBRARY_H
