@@ -6,15 +6,23 @@ from PIL import Image
 
 SQUARE_SIZE = 8
 
-DLL = ctypes.CDLL("./stegano.so")
+DLL = ctypes.CDLL("./stegano.dll")
 
 embed: ctypes.CFUNCTYPE = DLL.embed
 embed.argtypes = (ctypes.c_char_p, ctypes.c_uint64, ctypes.c_char_p, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64)
-embed.restype = ctypes.POINTER(ctypes.c_char)
+embed.restype = ctypes.c_void_p
 
 extract = DLL.extract
 extract.argtypes = (ctypes.c_char_p, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64)
-extract.restype = ctypes.POINTER(ctypes.c_char)
+extract.restype = ctypes.c_void_p
+
+get_data = DLL.get_data
+get_data.argtypes = (ctypes.c_void_p,)
+get_data.restype = ctypes.POINTER(ctypes.c_char)
+
+get_len = DLL.get_len
+get_len.argtypes = (ctypes.c_void_p,)
+get_len.restype = ctypes.c_uint64
 
 free = DLL.free
 free.argtypes = (ctypes.c_void_p,)
@@ -58,8 +66,8 @@ class Steganography:
         for reader, _ in self.images:
             image = Image.open(reader)
             channels = len(image.getbands())
-            length = int(int(image.width / SQUARE_SIZE) * int(
-                image.height / SQUARE_SIZE) * SQUARE_SIZE * SQUARE_SIZE * channels / 8)
+            length = int((int(image.width / SQUARE_SIZE) * int(
+                image.height / SQUARE_SIZE) - 1) * SQUARE_SIZE * SQUARE_SIZE * channels / 8)
             entropy = image.entropy()
             entropy_sum += entropy
             precomputed.append((entropy, length, image))
@@ -87,24 +95,34 @@ class Steganography:
 
         for i in range(len(pieces)):
             image = self.precomputed[i][1]
-            raw: ctypes.POINTER(ctypes.c_char) = embed(
+            channels = len(image.getbands())
+            raw = embed(
                 pieces[i],
                 ctypes.c_uint64(len(pieces[i])),
                 image.tobytes(),
                 ctypes.c_uint64(image.width),
                 ctypes.c_uint64(image.height),
-                ctypes.c_uint64(len(image.getbands()))
+                ctypes.c_uint64(channels)
             )
             image.close()
-            new_image = Image.frombuffer(image.mode, image.size, raw)
+            embedded = bytes(
+                ctypes.cast(raw, ctypes.POINTER(ctypes.c_char * (image.width * image.height * channels))).contents)
+            free(raw)
+
+            new_image = Image.frombuffer(image.mode, image.size, embedded)
             self.images[i][1].truncate(0)
             new_image.save(self.images[i][1], format_)
             self.images[i][1].close()
             new_image.close()
-            free(raw)
 
     @staticmethod
     def extract(src: BinaryIO) -> bytes:
         image = Image.open(src)
-        data: ctypes.POINTER(ctypes.c_char) = extract(image.tobytes(), image.width, image.height, len(image.getbands()))
-        result = ctypes.create_string_buffer(data, )
+        data: ctypes.c_void_p = extract(image.tobytes(), image.width, image.height, len(image.getbands()))
+        image.close()
+        src.close()
+        result_len = get_len(data)
+        result_ptr = get_data(data)
+        result = bytes(ctypes.cast(result_ptr, ctypes.POINTER(ctypes.c_char * result_len)).contents)
+        free(data)
+        return result
