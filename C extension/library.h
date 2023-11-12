@@ -18,6 +18,8 @@ uint8_t *get_data(const Data *data);
 
 uint64_t get_len(const Data *data);
 
+void free_(void *ptr);
+
 
 const uint64_t SQUARE_SIZE = 8;
 

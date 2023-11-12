@@ -34,6 +34,10 @@ uint64_t get_len(const Data *data) {
     return data->len;
 }
 
+void free_(void *ptr) {
+    free(ptr);
+}
+
 
 uint64_t calc_square_size(const Image *image) {
     return SQUARE_SIZE * SQUARE_SIZE * image->c / 8;

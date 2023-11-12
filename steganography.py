@@ -6,7 +6,7 @@ from PIL import Image
 
 SQUARE_SIZE = 8
 
-DLL = ctypes.CDLL("./stegano.dll")
+DLL = ctypes.CDLL("./libstegano.dll")
 
 embed: ctypes.CFUNCTYPE = DLL.embed
 embed.argtypes = (ctypes.c_char_p, ctypes.c_uint64, ctypes.c_char_p, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64)
@@ -24,7 +24,7 @@ get_len = DLL.get_len
 get_len.argtypes = (ctypes.c_void_p,)
 get_len.restype = ctypes.c_uint64
 
-free = DLL.free
+free = DLL.free_
 free.argtypes = (ctypes.c_void_p,)
 
 
