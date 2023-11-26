@@ -4,7 +4,7 @@ import secrets
 from dataclasses import dataclass
 from enum import Enum
 from io import BytesIO
-from typing import Self, BinaryIO
+from typing import Self, BinaryIO, Sequence
 
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
@@ -13,40 +13,21 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.ciphers.aead import AESCCM
 
-AES_SIZE = 32
-NONCE_SIZE = 8
-RSA_SIZE = 512
-SHA_SIZE = 32
-ID_SIZE = 8
-DYNAMIC_ID_SIZE = 8
-DYNAMIC_ID_NUM = 32
-
-
-class DynamicIDNotMatched(Exception):
-    pass
-
-
-class UserNotFound(Exception):
-    pass
-
-
-class InvalidUser(Exception):
-    pass
-
-
-class InvitationNotConfirmed(Exception):
-    pass
-
-
-class HashNotMatched(Exception):
-    pass
+# encryption macros
+AES_SIZE = 32  # the size of AES key
+NONCE_SIZE = 8  # the size of nonce (IV)
+RSA_SIZE = 512  # the size of RSA key
+SHA_SIZE = 32  # the size of SHA hash value
+ID_SIZE = 8  # the size of user IDs
+DYNAMIC_ID_SIZE = 8  # the size of dynamic IDs
+DYNAMIC_ID_NUM = 32  # the number of dynamic IDs exchanged in each communication
 
 
 @dataclass
 class KeySet:
     aes_key: bytes  # 32 bytes
     rsa_key: bytes  # 2347 bytes
-    dynamic_ids: tuple[bytes]  # 32 * 8 bytes
+    dynamic_ids: Sequence[bytes]  # 32 * 8 bytes
 
     def __bytes__(self) -> bytes:
         return self.aes_key + b"".join(self.dynamic_ids) + self.rsa_key
@@ -61,7 +42,7 @@ class KeySet:
         return KeySet(aes_key=data[:AES_SIZE], dynamic_ids=dynamic_ids, rsa_key=data[AES_SIZE + DYNAMIC_ID_NUM * 8:])
 
     @classmethod
-    def generate(cls, dynamic_ids: tuple[bytes]) -> Self:
+    def generate(cls, dynamic_ids: Sequence[bytes]) -> Self:
         aes_key = os.urandom(AES_SIZE)
         rsa_key = rsa.generate_private_key(65537, RSA_SIZE * 8).private_bytes(
             encoding=serialization.Encoding.DER,
@@ -109,7 +90,7 @@ class KeySets:
         return cls(new, crt, pst)
 
     @classmethod
-    def create(cls, dynamic_ids: tuple[bytes]) -> Self:
+    def create(cls, dynamic_ids: Sequence[bytes]) -> Self:
         return cls(KeySet.generate(dynamic_ids), None, None)
 
 
@@ -149,7 +130,7 @@ class User:
         return cls(id_, name, key_sets)
 
     @classmethod
-    def create(cls, name: str, id_: int, dynamic_ids: tuple[bytes], crt: KeySet | None = None) -> Self:
+    def create(cls, name: str, id_: int, dynamic_ids: Sequence[bytes], crt: KeySet | None = None) -> Self:
         key_sets = KeySets.create(dynamic_ids)
         key_sets.crt = crt
         return cls(id_, name, key_sets)
@@ -226,7 +207,7 @@ class Contacts:
             if user.id == updated_user.id:
                 self.users[i] = updated_user
                 return
-        raise UserNotFound(f"user with id {updated_user.id} not found")
+        raise ValueError(f"user with id {updated_user.id} not found")
 
     def invite(self, name: str) -> User:
         user = User.create(name, self.generate_id(), self.generate_dynamic_ids())
@@ -350,16 +331,16 @@ class Encryption:
 
         user = self.__contacts.find_by_id(id_)
         if user is None:
-            raise UserNotFound(f"user {id_} not found")
+            raise ValueError(f"user {id_} not found")
         match user.status:
             case UserStatus.Normal:
                 return self.__encrypt(data, user)
             case UserStatus.InvitationSent:
-                raise InvitationNotConfirmed(f"the invitation of user {id_} is not confirmed")
+                raise PermissionError(f"the invitation of user {id_} is not confirmed")
             case UserStatus.InvitationReceived:
                 return self.__encrypt(data, user)
             case UserStatus.Invalid:
-                raise InvalidUser(f"invalid user {id_} since its key sets are invalid")
+                raise ValueError(f"invalid user {id_} since its key sets are invalid")
 
     @classmethod
     def __encrypt(cls, data: bytes, user: User) -> bytes:
@@ -403,7 +384,7 @@ class Encryption:
         dynamic_id = reader.read(DYNAMIC_ID_SIZE)
         user, updated = self.__contacts.find_by_dynamic_id(dynamic_id)
         if user is None:
-            raise DynamicIDNotMatched(f"user not found: dynamic_id {dynamic_id.hex()} found")
+            raise ValueError(f"user not found: dynamic_id {dynamic_id.hex()} is not found")
         del dynamic_id
 
         nonce = reader.read(NONCE_SIZE)
@@ -430,7 +411,7 @@ class Encryption:
         expected_exchange_section_hash.update(exchange_section_plain)
         received_exchange_section_hash = reader.read(SHA_SIZE)
         if expected_exchange_section_hash.finalize() != received_exchange_section_hash:
-            raise HashNotMatched("exchange section hash not matched")
+            raise ValueError("exchange section hash not matched")
         del expected_exchange_section_hash, received_exchange_section_hash
 
         if updated:
@@ -455,7 +436,7 @@ class Encryption:
         expected_data_hash.update(data_plain)
         received_data_hash = data_cipher[len(data_cipher) - SHA_SIZE:]
         if received_data_hash != expected_data_hash.finalize():
-            raise HashNotMatched("data hash not matched")
+            raise ValueError("data hash not matched")
         del expected_data_hash, received_data_hash, data_cipher
 
         return data_plain, user

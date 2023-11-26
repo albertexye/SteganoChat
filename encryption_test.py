@@ -92,7 +92,7 @@ class ContactsTest(unittest.TestCase):
 
         nonexistent_user = copy.deepcopy(normal_user)
         nonexistent_user.id += 1
-        self.assertRaises(encryption.UserNotFound, contacts.update_user, nonexistent_user)
+        self.assertRaises(ValueError, contacts.update_user, nonexistent_user)
 
         contacts.save(file)
         file.seek(0)
@@ -112,7 +112,7 @@ class EncryptionTest(unittest.TestCase):
                 invitation, user2 = e1.invite("TestUser2", key)
                 user1 = e2.receive_invitation(invitation, "TestUser1", key)
 
-                self.assertRaises(encryption.InvitationNotConfirmed, e1.send, word, user2.id)
+                self.assertRaises(PermissionError, e1.send, word, user2.id)
 
                 msg = e2.send(word, user1.id)
                 received_word, received_user = e1.receive(msg)
