@@ -1,56 +1,102 @@
-#ifndef C_EXTENSION_LIBRARY_H
-#define C_EXTENSION_LIBRARY_H
+#ifndef STEGANO_H
+#define STEGANO_H
 
 #include <inttypes.h>
 #include <stdbool.h>
-
-
-typedef struct Data {
-    uint8_t *data;
-    uint64_t len;
-} Data;
-
-uint8_t *embed(uint8_t *data, uint64_t data_len, uint8_t *pixel, uint64_t image_w, uint64_t image_h, uint64_t image_c);
-
-Data *extract(const uint8_t *pixels, uint64_t image_w, uint64_t image_h, uint64_t image_c);
-
-uint8_t *get_data(const Data *data);
-
-uint64_t get_len(const Data *data);
-
-void free_(void *ptr);
-
-
-const uint64_t SQUARE_SIZE = 8;
-
-typedef struct Image {
-    uint8_t *pixels;
-    uint64_t w, h, c;
-} Image;
 
 typedef struct Square {
     uint64_t x, y;
     double entropy;
 } Square;
 
-uint64_t calc_square_size(const Image *image);
+typedef struct SquareList {
+    Square *squares;
+    uint64_t len;
+} SquareList;
 
-uint64_t calc_image_capacity(const Image *image);
+typedef struct Image {
+    uint64_t w, h, c;
+    uint8_t *pixels;
+    SquareList squareList;
+    uint64_t usage;
+    bool copied;
+} Image;
+
+typedef struct ImageList {
+    Image *images;
+    uint64_t len;
+} ImageList;
+
+typedef struct Data {
+    uint8_t *data;
+    uint64_t len;
+    bool padded;
+} Data;
+
+typedef struct DataPieces {
+    Data *pieces;
+    uint64_t len;
+} DataPieces;
+
+typedef struct Precomputed {
+    ImageList imageList;
+    uint64_t code;
+} Precomputed;
+
+typedef struct Extracted {
+    Data data;
+    uint64_t code;
+} Extracted;
+
+typedef Precomputed Embedded;
+
+Precomputed precompute(ImageList imageList, uint64_t dataLen, uint64_t reserved);
+
+void free_precomputed(Precomputed precomputed);
+
+Embedded embed(Precomputed precomputed, DataPieces dataPieces);
+
+Extracted extract(Image image, uint64_t reserved);
+
+void free_extracted(Extracted extracted);
+
+extern const uint64_t SquareSize;
+
+extern const uint64_t OK, AllocationFailure, OversizedData, BadDataPiecesLen, BadPrecomputed, InvalidLen;
+
+
+uint64_t copy_imageList(ImageList *imageList);
 
 void calc_entropy(const Image *image, Square *square);
 
 int compare_squares(const void *a, const void *b);
 
-Square *get_squares(const Image *image);
+uint64_t generate_squares(Image *image, uint64_t reservedSquareNum);
 
-void embed_square(const Image *image, const Square *square, const uint8_t *data);
+uint64_t init_imageList(ImageList *imageList, uint64_t reserved);
 
-bool embed_data(const Image *image, const Square *squares, const uint8_t *data, uint64_t data_len);
+uint64_t count_images(ImageList *imageList, uint64_t dataLen, uint64_t reservedSquareNum);
 
-void extract_square(const Image *image, const Square *square, uint8_t *data);
+void prune_images(ImageList *imageList);
 
-uint64_t extract_length(const Image *image, const Square *squares);
+void free_image(Image *image);
 
-Data *extract_data(const Image *image, const Square *squares);
+void free_imageList(ImageList *imageList);
 
-#endif //C_EXTENSION_LIBRARY_H
+void embed_len(Image *image, const Square *square, uint64_t len);
+
+void embed_square(Image *image, const Square *square, const uint8_t *data);
+
+void embed_image(Image *image, const Data *data);
+
+uint64_t padding(const Image *image, Data *data);
+
+void free_data(Data *data);
+
+void free_dataPieces(DataPieces *dataPieces);
+
+uint64_t extract_len(const Image *image, const Square *square);
+
+void extract_data(const Image *image, const Square *square, uint8_t *data);
+
+#endif
