@@ -1,6 +1,8 @@
 import ctypes
 from enum import Enum
 from typing import BinaryIO, Sequence
+import pathlib
+import os.path
 
 from PIL import Image
 
@@ -102,7 +104,7 @@ class CPrecomputed(ctypes.Structure):
         ('code', ctypes.c_uint64),
     )
 
-    def get_lengths(self, reserved: int) -> tuple[int]:
+    def get_lengths(self, reserved: int) -> tuple[int, ...]:
         """Gets the lengths of data pieces (without structure size)
 
         :param reserved: the reserved size for structures
@@ -128,7 +130,7 @@ class CExtracted(ctypes.Structure):
 CEmbedded = CPrecomputed
 
 # C function definitions
-DLL = ctypes.CDLL("./libstegano.dll")
+DLL = ctypes.CDLL(os.path.join(pathlib.Path(__file__).parent.resolve(), "libstegano.dll"))
 
 # Precomputed precompute(ImageList imageList, uint64_t dataLen, uint64_t reserved);
 precompute: ctypes.CFUNCTYPE = DLL.precompute
@@ -161,7 +163,7 @@ class CStatus(Enum):
 
     OK = 0
     AllocationFailure = 1  # alloc(...) == NULL
-    OversizedData = 2  # the images can't contain the data
+    OversizeData = 2  # the images can't contain the data
     BadDataPiecesLen = 3  # DataPieces.len != Precomputed.imageList.len
     BadPrecomputed = 4  # a Precomputed with an error code is passed to embed
     InvalidLen = 5  # invalid length of data in the extracted image
@@ -196,8 +198,8 @@ class Steganography:
         match code:
             case CStatus.AllocationFailure:
                 raise MemoryError("memory allocation failure in CDLL")
-            case CStatus.OversizedData.value:
-                raise ValueError("oversized data")
+            case CStatus.OversizeData.value:
+                raise ValueError("oversize data")
             case CStatus.BadDataPiecesLen.value:
                 raise ValueError("precomputed data is invalid: invalid len")
             case CStatus.BadPrecomputed:
@@ -260,7 +262,7 @@ class Steganography:
         self.__handle_error_code(self.precomputed.code)
         self.is_precomputed = True
 
-    def embed(self, pieces: Sequence[bytes], format_: str = "PNG"):
+    def embed(self, pieces: Sequence[bytes], format_: str = "PNG") -> None:
         """Embeds pieces of data into the images. Call this method after calling **precompute**.
 
         :param pieces: the pieces of data being embedded, including the structures

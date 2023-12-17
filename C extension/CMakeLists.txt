@@ -15,6 +15,6 @@ set_target_properties(stegano PROPERTIES
         DEBUG_POSTFIX "_debug"  # Add a "_d" postfix for debug builds
 )
 
-install(TARGETS stegano DESTINATION ${PROJECT_SOURCE_DIR}/.. CONFIGURATIONS Release)
+install(TARGETS stegano DESTINATION ${PROJECT_SOURCE_DIR}/../steganography/ CONFIGURATIONS Release)
 
 add_executable(test test.c library.h library.c)

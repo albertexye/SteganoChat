@@ -202,19 +202,32 @@ class Contacts:
                 return user, True
         return None, False
 
+    def find_by_name(self, name: str) -> User | None:
+        for user in self.users:
+            if user.name == name:
+                return user
+        return None
+
     def update_user(self, updated_user: User) -> None:
         for i, user in enumerate(self.users):
             if user.id == updated_user.id:
+                if user.name != updated_user.name:
+                    if self.find_by_name(updated_user.name) is not None:
+                        raise ValueError(f"duplicate user with name {updated_user.name}")
                 self.users[i] = updated_user
                 return
         raise ValueError(f"user with id {updated_user.id} not found")
 
     def invite(self, name: str) -> User:
+        if self.find_by_name(name) is not None:
+            raise ValueError(f"duplicate user with name {name}")
         user = User.create(name, self.generate_id(), self.generate_dynamic_ids())
         self.users.append(user)
         return user
 
     def receive_invitation(self, name: str, crt: KeySet) -> User:
+        if self.find_by_name(name) is not None:
+            raise ValueError(f"duplicate user with name {name}")
         user = User.create(name, self.generate_id(), self.generate_dynamic_ids(), crt)
         self.users.append(user)
         return user
@@ -237,7 +250,7 @@ class Contacts:
         file.truncate()
         file.write(bytes(self))
 
-    def generate_dynamic_ids(self) -> tuple[bytes]:
+    def generate_dynamic_ids(self) -> tuple[bytes, ...]:
         dynamic_ids = []
         for _ in range(DYNAMIC_ID_NUM):
             while True:
@@ -268,16 +281,16 @@ class Contacts:
 
 
 class Encryption:
-    __contacts: Contacts
+    contacts: Contacts
     __file: BinaryIO
     __closed: bool
 
     def __init__(self, contacts: BinaryIO, key: str, create: bool = False):
         self.__file = contacts
         if create:
-            self.__contacts = Contacts.create(contacts, key)
+            self.contacts = Contacts.create(contacts, key)
         else:
-            self.__contacts = Contacts.open(contacts, key)
+            self.contacts = Contacts.open(contacts, key)
         self.__closed = False
 
     def __enter__(self):
@@ -297,13 +310,13 @@ class Encryption:
     def save(self) -> None:
         if self.__closed:
             raise ValueError("contacts has been closed")
-        self.__contacts.save(self.__file)
+        self.contacts.save(self.__file)
 
     def invite(self, name: str, key: str) -> tuple[bytes, User]:
         if self.__closed:
             raise ValueError("contacts has been closed")
 
-        user = self.__contacts.invite(name)
+        user = self.contacts.invite(name)
         plain = bytes(KeySet(user.keys.new.aes_key, user.keys.new.public_key, user.keys.new.dynamic_ids))
 
         h = hashes.Hash(hashes.SHA256())
@@ -323,13 +336,13 @@ class Encryption:
         plain = f.decrypt(cipher, None)
         crt = KeySet.load(plain)
 
-        return self.__contacts.receive_invitation(name, crt)
+        return self.contacts.receive_invitation(name, crt)
 
     def send(self, data: bytes, id_: int) -> bytes:
         if self.__closed:
             raise ValueError("contacts has been closed")
 
-        user = self.__contacts.find_by_id(id_)
+        user = self.contacts.find_by_id(id_)
         if user is None:
             raise ValueError(f"user {id_} not found")
         match user.status:
@@ -382,7 +395,7 @@ class Encryption:
         reader = BytesIO(cipher)
 
         dynamic_id = reader.read(DYNAMIC_ID_SIZE)
-        user, updated = self.__contacts.find_by_dynamic_id(dynamic_id)
+        user, updated = self.contacts.find_by_dynamic_id(dynamic_id)
         if user is None:
             raise ValueError(f"user not found: dynamic_id {dynamic_id.hex()} is not found")
         del dynamic_id
@@ -423,7 +436,7 @@ class Encryption:
 
             user.keys.pst = user.keys.new
             user.keys.crt = KeySet(new_aes_key, new_public_key, new_dynamic_ids)
-            user.keys.new = KeySet.generate(self.__contacts.generate_dynamic_ids())
+            user.keys.new = KeySet.generate(self.contacts.generate_dynamic_ids())
             del new_aes_key, new_dynamic_ids, new_public_key
         del exchange_section_plain
 

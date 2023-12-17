@@ -38,7 +38,7 @@ class SteganographyTest(unittest.TestCase):
             print(e)
             return
 
-        self.fail("no error raised on oversized data")
+        self.fail("no error raised on oversize data")
 
     def test_invalid_image(self):
         reserved = 130

@@ -3,7 +3,7 @@ import time
 from typing import Sequence
 
 
-def split(data: bytes, chunks: Sequence[int]) -> tuple[bytes]:
+def split(data: bytes, chunks: Sequence[int]) -> tuple[bytes, ...]:
     """Splits data into chunks
 
     :param data: the data that need to be split
